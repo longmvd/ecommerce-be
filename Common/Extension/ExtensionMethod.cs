@@ -91,5 +91,21 @@ namespace ECommerce.Common.Extension
                 dic.Add(key, value);
             }
         }
+
+        public static Type GetPropertyType (this Type type, string propertyName) 
+        {
+            PropertyInfo[] propertyInfos = type.GetProperties();
+            PropertyInfo property = null;
+            if(propertyInfos != null)
+            {
+                property = propertyInfos.SingleOrDefault(p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if(property != null)
+            {
+                return property.PropertyType;
+            }
+            return typeof(object);
+        }
     }
 }

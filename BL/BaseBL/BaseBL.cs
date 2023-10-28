@@ -1,11 +1,13 @@
 ﻿using Common.Entities;
+using ECommerce.Common;
 using ECommerce.Common.Attributes;
 using ECommerce.Common.DTO;
 using ECommerce.Common.Entities;
 using ECommerce.Common.Enums;
 using ECommerce.Common.Extension;
 using ECommerce.DL;
-using GraphQL;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,7 +22,7 @@ using System.Threading.Tasks;
 namespace ECommerce.BL
 {
 
-    public class BaseBL : IBaseBL
+    public partial class BaseBL : IBaseBL
     {
         //protected IAuthService _authService;
         protected IBaseDL _baseDL;
@@ -29,11 +31,18 @@ namespace ECommerce.BL
             _baseDL = baseDL;
         }
 
-        protected string _userName;
+        protected string _userName = "";
 
-        public IEnumerable<User> GetAll()
+
+
+        //public IEnumerable<dynamic> GetAll(Type type)
+        //{
+        //    return _baseDL.GetAll<typeof type>();
+        //}
+
+        public IEnumerable<BaseEntity> GetAllBase()
         {
-            return _baseDL.GetAll<User>();
+            return _baseDL.GetAllBase();
         }
         public ServiceResponse Save(BaseEntity entity)
         {
@@ -110,6 +119,8 @@ namespace ECommerce.BL
         public virtual void AfterCommit(BaseEntity entity, ServiceResponse response)
         {
             //todo
+            response.Data = entity;
+            response.ServerTime = DateTime.Now;
         }
 
         public virtual void AfterSave(BaseEntity entity, IDbTransaction transaction)
@@ -121,12 +132,12 @@ namespace ECommerce.BL
         {
             var dic = new Dictionary<string, object>();
             entity.SetAutoPrimaryKey();
-            string storedProcedure = entity.State == ModelState.Update ? GetUpdateProcedureName(entity): this.BuildInsertCommandText<BaseEntity>(entity, ref dic);
+            string storedProcedure = entity.State == ModelState.Update ? this.BuildUpdateCommandText<BaseEntity>(entity, ref dic) : this.BuildInsertCommandText<BaseEntity>(entity, ref dic);
             //var dic = Converter.ConvertDatabaseParam(entity);
-            
+
             if (entity.GetPrimaryKeyType() == typeof(int))
             {
-                var primaryKey = ExecuteScalarUsingStoredProcedure<int>(storedProcedure, transaction, dic);
+                var primaryKey = ExecuteScalarAsyncUsingStoredProcedure<int>(storedProcedure, transaction, dic).Result;
                 if (entity.State == ModelState.Insert || entity.State == ModelState.Dupplicate)
                 {
                     entity.SetValueByAttribute(typeof(KeyAttribute), primaryKey);
@@ -150,7 +161,7 @@ namespace ECommerce.BL
                                 detailObject.State == ModelState.Update ||
                                 detailObject.State == ModelState.Dupplicate)
                             {
-                                detailObjects.Set(config.ForeignKeyName, entity.GetValueOfPrimaryKey());
+                                detailObject.Set(config.ForeignKeyName, entity.GetValueOfPrimaryKey());
                                 if (detailObject.State == ModelState.Insert ||
                                 detailObject.State == ModelState.Dupplicate)
                                 {
@@ -189,7 +200,7 @@ namespace ECommerce.BL
 
         public ServiceResponse SaveList(IEnumerable<BaseEntity> entities)
         {
-            throw new NotImplementedException();
+            return SaveListAsync(entities).Result;
         }
 
         public void Validate()
@@ -244,16 +255,16 @@ namespace ECommerce.BL
 
         public async Task<T> ExecuteScalarAsyncUsingStoredProcedure<T>(string storedProcedureName, IDbTransaction transaction, object param)
         {
-            return await _baseDL.ExecuteScalarUsingStoredProcedure<T>(storedProcedureName, (IDictionary<string, object>)param, null, transaction);
+            return await _baseDL.ExecuteScalarAsyncUsingStoredProcedure<T>(storedProcedureName, (IDictionary<string, object>)param, null, transaction);
         }
         #region Build Command Text
 
-        public string BuildInsertCommandText<T>(List<T> entities, ref Dictionary<string, object> dic)
+        public string BuildInsertCommandText<T>(List<T> entities, ref Dictionary<string, object> dic, bool useRowCount = false)
         {
-            StringBuilder builder = new StringBuilder();
+            StringBuilder builder = new();
             if (entities != null && entities.Count > 0)
             {
-                var tableConfig = entities[0].GetType().GetCustomAttributes<TableConfigAttribute>(true).FirstOrDefault();
+                var tableConfig = entities[0]?.GetType().GetCustomAttributes<TableConfigAttribute>(true).FirstOrDefault();
                 var param = new Dictionary<string, object>();
                 var commandParams = new List<string>();
                 if (tableConfig != null)
@@ -263,8 +274,8 @@ namespace ECommerce.BL
                     for (int i = 0; i < entities.Count; i++)
                     {
                         var entity = entities[i];
-                        var properties = entity.GetType().GetProperties();
-                        if (properties.Length > 0)
+                        var properties = entity?.GetType().GetProperties();
+                        if (properties?.Length > 0)
                         {
                             StringBuilder paramBuilder = new StringBuilder("(");
                             foreach (var property in properties)
@@ -312,19 +323,88 @@ namespace ECommerce.BL
                     }
                     builder.Remove(builder.Length - 1, 1);
                     builder.Append(";");
+                    _ = useRowCount ? builder.Append("SELECT ROW_COUNT();") : builder.Append("SELECT LAST_INSERT_ID();");
                 }
             }
             return builder.ToString();
         }
 
-        public string BuildUpdateCommandText<T>(List<T> entities, ref Dictionary<string, object> dic)
+        public string BuildUpdateCommandText<T>(List<T> entities, ref Dictionary<string, object> dic, bool useRowCount = false)
         {
-            throw new NotImplementedException();
+
+            StringBuilder builder = new();
+            if (entities != null && entities.Count > 0)
+            {
+                var tableConfig = entities[0]?.GetType().GetCustomAttributes<TableConfigAttribute>(true).FirstOrDefault();
+                var propertiesInfo = entities[0]?.GetType().GetProperties();
+                var commandParams = new HashSet<string>();
+                if (tableConfig != null && propertiesInfo != null)
+                {
+                    builder.Append($"Update {tableConfig.TableName} SET ");
+                    var keyAttr = propertiesInfo.SingleOrDefault(p => p.GetCustomAttribute<KeyAttribute>(true) != null);
+                    var keyAttrName = keyAttr?.Name ?? string.Empty;
+                    var keyStringParams = new List<string>();
+                    foreach (var property in propertiesInfo)
+                    {
+                        if (property.GetCustomAttribute<KeyAttribute>(true) != null || property.GetCustomAttributes<NotMappedAttribute>(true).FirstOrDefault() != null)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            var tableColumn = property.Name ?? property.GetCustomAttributes<ColumnAttribute>(true).FirstOrDefault()?.Name;
+                            builder.Append($"{tableColumn} = CASE ");
+                            for (var i = 0; i < entities.Count; i++)
+                            {
+                                builder.Append($"WHEN {keyAttrName} = @{keyAttrName}{i} THEN @{tableColumn}{i} ");
+                                dic.TryAdd($"@{keyAttrName}{i}", keyAttr.GetValue(entities[i]));
+                                dic.TryAdd($"@{tableColumn}{i}", property.GetValue(entities[i]));
+                                keyStringParams.Add($"@{keyAttrName}{i}");
+                            }
+                            builder.Append("END,");
+                        }
+                    }
+                    builder.Remove(builder.Length - 1, 1);
+                    var ids = entities.Select((entity, index) => $"@{keyAttrName}{index}").ToList();
+                    builder.Append($" WHERE {keyAttrName} IN ({string.Join(",", ids)})");
+
+
+                    builder.Append(";");
+                    _ = useRowCount ? builder.Append("SELECT ROW_COUNT();") : builder.Append("");
+
+                }
+            }
+            return builder.ToString();
         }
 
-        public string BuildDeleteCommandText<T>(List<T> entities, ref Dictionary<string, object> dic)
+        public string BuildDeleteCommandText<T>(List<T> entities, ref Dictionary<string, object> dic, bool useRowCount = false)
         {
-            throw new NotImplementedException();
+            var builder = new StringBuilder();
+            if (entities != null && entities.Count > 0)
+            {
+                var tableConfig = entities[0]?.GetType().GetCustomAttributes<TableConfigAttribute>(true).FirstOrDefault();
+                var param = new Dictionary<string, object>();
+                var commandParams = new List<string>();
+                if (tableConfig != null)
+                {
+                    var propertiesInfo = entities[0]?.GetType().GetProperties();
+                    var keyAttr = propertiesInfo?.SingleOrDefault(p => p.GetCustomAttribute<KeyAttribute>(true) != null);
+                    var keyAttrName = keyAttr?.Name ?? string.Empty;
+                    builder.Append($"DELETE FROM {tableConfig.TableName} WHERE {keyAttrName} IN (");
+
+                    for (int i = 0; i < entities.Count; i++)
+                    {
+                        var entity = entities[i];
+                        builder.Append($"@{keyAttrName}{i},");
+                        dic.Add($"@{keyAttrName}{i}", keyAttr.GetValue(entity));
+                    }
+
+                    builder.Remove(builder.Length - 1, 1);
+                    builder.Append(");");
+                    _ = useRowCount ? builder.Append("SELECT ROW_COUNT();") : builder.Append("SELECT LAST_INSERT_ID();");
+                }
+            }
+            return builder.ToString();
         }
 
         public string BuildInsertCommandText<T>(T entity, ref Dictionary<string, object> dic)
@@ -340,7 +420,225 @@ namespace ECommerce.BL
         public string BuildDeleteCommandText<T>(T entity, ref Dictionary<string, object> dic)
         {
             return BuildDeleteCommandText<T>(new List<T>() { entity }, ref dic);
-        } 
+        }
+
+        public string BuildPagingCommandText(Type type, PagingRequest pagingRequest, ref Dictionary<string, object> param)
+        {
+            var builder = new StringBuilder();
+
+            int pageIndex = pagingRequest.PageIndex;
+            int pageSize = pagingRequest.PageSize;
+            var conditions = new List<string>();
+            if (!string.IsNullOrWhiteSpace(pagingRequest.Filter))
+            {
+                var filter = JsonConvert.DeserializeObject<JArray>(pagingRequest.Filter);
+                conditions.Add(BuildCondition(type, filter, ref param));
+            }
+            if (!string.IsNullOrWhiteSpace(pagingRequest.CustomFilter))
+            {
+                var filter = JsonConvert.DeserializeObject<JArray>(pagingRequest.CustomFilter);
+                conditions.Add(BuildCondition(type, filter, ref param));
+            }
+            if (pagingRequest.QuickSearch != null)
+            {
+                var searchObject = pagingRequest.QuickSearch;
+                conditions.Add(BuildSearchCondition(type, searchObject, ref param));
+            }
+            if (conditions.Count > 0)
+            {
+                builder.Append(string.Join(" AND ", conditions));
+            }
+            if (pagingRequest.Sort != null)
+            {
+                var sort = JsonConvert.DeserializeObject<List<PagingSort>>(pagingRequest.Sort ?? "");
+                builder.Append(BuildSortOrder(sort));
+            }
+            builder.Append(BuildLimit(ref pageSize, ref pageIndex));
+            
+            builder.Append(BuildSelectCount(type, string.Join(" AND ", conditions)));
+            
+            var commandText = builder.ToString();
+
+
+
+            return commandText;
+        }
+
+
+
+        private string BuildCondition(Type type, JToken filters, ref Dictionary<string, object> param)
+        {
+            if (filters != null)
+            {
+                string whereCondition = "";
+                int index = 0;
+                foreach (var element in filters)
+                {
+                    if (element == null)
+                    {
+                        return whereCondition;
+                    }
+                    if (element.GetType() == typeof(JValue))
+                    {
+                        if (index == 0 && !SecurityUtils.IsValidColumn(type, element.ToString()))
+                        {
+                            throw new Exception($"Column {element.ToString()} is not exist.");
+                        }
+
+                        if (index == 2)
+                        {
+                            var stringParam = Utils.GenerateSearchParam();
+                            whereCondition = string.Format(whereCondition, stringParam);
+                            var conditionValue = GetConditionValue(filters?[1]?.ToString() ?? "", element.ToString());
+                            param.TryAdd(stringParam, conditionValue);
+                        }
+                        else
+                        {
+                            whereCondition += " " + GetCondition(element.ToString()) + " ";
+                        }
+                    }
+                    if (element.GetType() == typeof(JArray))
+                    {
+                        whereCondition += this.BuildCondition(type, element, ref param);
+                    }
+                    index++;
+                    Console.WriteLine(element.GetType() == typeof(JArray));
+                }
+                return "(" + whereCondition + ")";
+            }
+            return "";
+        }
+
+        private string GetCondition(string value)
+        {
+            switch (value.ToUpper())
+            {
+                case Operator.Equal:
+                    return "= {0}";
+                case Operator.Contains:
+                    return "LIKE {0}";
+                //return "LIKE";
+                case Operator.NotEqual:
+                    return "<> {0}";
+                case Operator.LessOrEqual:
+                    return "<= {0}";
+                case Operator.GreaterOrEqual:
+                    return ">= {0}";
+                case Operator.LessThan:
+                    return "< {0}";
+                case Operator.GreaterThan:
+                    return "> {0}";
+                case Operator.StartWith:
+                    //return "LIKE";
+                    return "LIKE {0}";
+                case Operator.EndWith:
+                    //return "LIKE";
+                    return "LIKE {0}";
+                case Operator.And:
+                    return "AND";
+                case Operator.Or:
+                    return "OR";
+                case Operator.IsNotNull:
+                    return "IS NOT NULL";
+                case Operator.NotNull:
+                    return "NOT NULL";
+
+
+            }
+            return value;
+        }
+
+        private string GetConditionValue(string op, string value)
+        {
+            switch (op.ToUpper())
+            {
+                case Operator.Contains:
+                    return $"'%{SecurityUtils.SafetyCharsForLIKEOperator(value)}%'";
+                case Operator.StartWith:
+                    //return "LIKE";
+                    return $"'%{SecurityUtils.SafetyCharsForLIKEOperator(value)}'";
+                case Operator.EndWith:
+                    //return "LIKE";
+                    return $"'{SecurityUtils.SafetyCharsForLIKEOperator(value)}%'";
+            }
+            return $"{SecurityUtils.SafetyCharsForLIKEOperator(value)}";
+        }
+
+        private string BuildSortOrder(IEnumerable<PagingSort> sorts)
+        {
+            
+            var sortOrder = new StringBuilder();
+            if (sorts != null)
+            {
+                sortOrder.Append(" ORDER BY");
+                foreach (var sort in sorts)
+                {
+                    sortOrder.Append (" " + sort.Selector + " " + (sort.Desc ? "DESC" : "ASC") + ",");
+                }
+                
+                return sortOrder.ToString().Remove(sortOrder.Length - 1);
+
+            }
+            return "";
+        }
+
+        private string BuildSearchCondition(Type typeModel, QuickSearch quickSearch, ref Dictionary<string, object> parameter)
+        {
+            var columns = quickSearch.Columns;
+            var instance = (BaseEntity)Activator.CreateInstance(typeModel);
+            var conditions = new List<string>();
+            if (quickSearch != null && quickSearch.Columns != null && quickSearch.Columns.Length > 0)
+            {
+                parameter.Add("@SearchValue", $"%{SecurityUtils.SafetyCharsForLIKEOperator(quickSearch.SearchValue)}%");
+                columns = SecurityUtils.GetColumns(columns, instance);
+                if (columns != null)
+                {
+                    foreach (var column in columns.Split(",").Select(x => x.Trim()))
+                    {
+                        var type = typeModel.GetPropertyType(column.ToString());
+                        if (Nullable.GetUnderlyingType(type) == typeof(DateTime))
+                        {
+
+                        }
+                        else
+                        {
+                            conditions.Add($"( {column} LIKE @SearchValue)");
+                        }
+                    }
+                    return "( " + string.Join(" OR ", conditions) + " )";
+                }
+
+            }
+            return "";
+        }
+
+        private string BuildSelectCount(Type typeModel, string condition)
+        {
+            var instance = (BaseEntity)Activator.CreateInstance(typeModel);
+            return $"SELECT COUNT(1) FROM {instance.GetTableConfig().TableName ?? typeModel.Name} WHERE {condition}";
+        }
+
+
+
+        public string BuildLimit(ref int pageSize, ref int pageIndex)
+        {
+            if (pageSize > DatabaseConstant.MaxReturnRecord || pageSize <= 0)
+            {
+                pageSize = DatabaseConstant.MaxReturnRecord;
+            }
+            if (pageIndex <= 0)
+            {
+                pageIndex = 1;
+            }
+            if (pageIndex > DatabaseConstant.MaxPageIndex)
+            {
+                pageIndex = DatabaseConstant.MaxPageIndex;
+            }
+            return $" LIMIT {pageSize} OFFSET {(pageIndex - 1) * pageSize};";
+        }
+
+
+
         #endregion
     }
 }

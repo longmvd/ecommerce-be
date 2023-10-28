@@ -7,13 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HotChocolate" Version="13.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DL\ECommerce.DL.csproj" />
-    <ProjectReference Include="..\Types\Ecommerce.Types.csproj" />
   </ItemGroup>
 
 </Project>

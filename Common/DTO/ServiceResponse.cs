@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ECommerce.Common.Extension;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -44,6 +45,8 @@ namespace ECommerce.Common.DTO
         public ServiceResponse OnException(object data)
         {
             this.IsSuccess = false;
+            this.Data = data?.Get<string>("Data");
+            this.SystemMessage = data?.Get<string>("ExceptionMessage");
             //todo
             return this;
         }
@@ -51,6 +54,8 @@ namespace ECommerce.Common.DTO
         public ServiceResponse OnError(object data)
         {
             this.IsSuccess = false;
+            this.Data = data?.Get<string>("Data");
+            this.SystemMessage = data?.Get<string>("ErrorMessage");
             //todo
             return this;
         }

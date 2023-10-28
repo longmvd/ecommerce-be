@@ -1,7 +1,5 @@
 ﻿using Common.Entities;
-using Ecommerce.Types;
 using ECommerce.DL;
-using GraphQL.Types;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,11 +8,9 @@ using System.Threading.Tasks;
 
 namespace ECommerce.BL
 {
-    public class BaseEntityQuery: ObjectGraphType
+    public static class BaseEntityQuery
     {
-        public BaseEntityQuery(IBaseDL baseDL) {
-            Field<ListGraphType<BaseEntityType>>("BaseEntity", resolve: context => baseDL.GetAllBase());
-            //Field<ListGraphType<BaseEntityType>>("User", resolve: contex => )
-        }
+        public static string BaseBL_GetAll = "SELECT * FROM {0};";
+        public static string BaseBL_GetPaging = "SELECT {0} FROM {1} WHERE {2};";
     }
 }

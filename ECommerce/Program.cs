@@ -1,17 +1,18 @@
 using Common.Entities;
 using Ecommerce.DL;
-using Ecommerce.Types;
 using ECommerce.BL;
+using ECommerce.Common.Entities;
 using ECommerce.DL;
 using Microsoft.AspNetCore.Builder;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddScoped(typeof(IBaseDL), typeof(BaseDL));
 builder.Services.AddScoped(typeof(IBaseBL), typeof(BaseBL));
-builder.Services.AddScoped<IUserDL, UserDL>();
-builder.Services.AddScoped<IUserBL, UserBL>();
+//builder.Services.AddScoped<IProductDL, ProductDL>();
+//builder.Services.AddScoped<IProductBL, ProductBL>();
 //builder.Services.AddSingleton<BaseEntityQuery>();
 //builder.Services.AddSingleton<BaseEntityType>();
 //builder.Services.AddSingleton<IDocumentExecuter, DocumentExecuter>();
@@ -20,6 +21,7 @@ builder.Services.AddScoped<IUserBL, UserBL>();
 // Add services to the container.
 
 DatabaseContext.ConnectionString = builder.Configuration.GetConnectionString("MySql");
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -32,6 +34,15 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.PropertyNamingPolicy = null);
 builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => options.SuppressModelStateInvalidFilter = true);
 
+//if (!builder.Environment.IsDevelopment())
+//{
+//    builder.Services.AddHttpsRedirection(options =>
+//    {
+//        options.RedirectStatusCode = (int)HttpStatusCode.PermanentRedirect;
+//        options.HttpsPort = 443;
+//    });
+//}
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -41,7 +52,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseAuthorization();
 

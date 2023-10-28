@@ -16,6 +16,7 @@ namespace ECommerce.Common.Attributes
 
         public bool? IsDeleted { get; set; }
 
+
         public string? InsertStoredProcedure { get; set; }
         public string? UpdateStoredProcedure { get; set; }
         public string? DeleteStoredProcedure { get; set; }

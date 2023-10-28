@@ -4,10 +4,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HotChocolate.AspNetCore" Version="13.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
@@ -16,7 +16,6 @@
     <ProjectReference Include="..\BL\ECommerce.BL.csproj" />
     <ProjectReference Include="..\Common\ECommerce.Common.csproj" />
     <ProjectReference Include="..\DL\ECommerce.DL.csproj" />
-    <ProjectReference Include="..\GraphQL\Ecommerce.GraphQL.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
-﻿using ECommerce.Common.Entities;
+﻿using ECommerce.Common.Attributes;
+using ECommerce.Common.Entities;
 using ECommerce.Common.Enums;
 using System;
 using System.Collections.Generic;
@@ -44,6 +45,21 @@ namespace Common.Entities
             return null;
         }
 
+        public bool HasProperty(string propretyName)
+        {
+            if (this != null && !string.IsNullOrEmpty(propretyName))
+            {
+                return this?.GetType()?.GetProperty(propretyName) != null;
+
+            }
+            return false;
+        }
+
+        public bool IsValidColumn(string columnName)
+        {
+            return HasProperty(columnName);
+        }
+
         public void SetPrimaryKey(string value)
         {
             var properties = this.GetType().GetProperties();
@@ -52,7 +68,7 @@ namespace Common.Entities
 
             if (properties != null)
             {
-                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttributes<KeyAttribute>(true) != null);
+                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttribute<KeyAttribute>(true) != null);
 
                 if (propertyKeyInfo != null)
                 {
@@ -120,11 +136,12 @@ namespace Common.Entities
 
             if (properties != null)
             {
-                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttributes(attributeType, true) != null);
+                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttribute(attributeType, true) != null);
 
             }
-            return propertyKeyInfo;
+            return propertyKeyInfo.GetValue(this);
         }
+
 
         public void SetValueByAttribute(Type attributeType, object? value)
         {
@@ -134,7 +151,7 @@ namespace Common.Entities
 
             if (properties != null)
             {
-                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttributes(attributeType, true) != null);
+                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttribute(attributeType, true) != null);
             }
 
             if (propertyKeyInfo != null) {
@@ -147,6 +164,27 @@ namespace Common.Entities
         {
             return GetValueByAttribute(typeof(KeyAttribute));
         }
+
+        public PropertyInfo GetPropertyByAttribute(Type attributeType)
+        {
+            var properties = this.GetType().GetProperties();
+
+            PropertyInfo propertyKeyInfo = null;
+
+            if (properties != null)
+            {
+                propertyKeyInfo = properties.SingleOrDefault(p => p.GetCustomAttribute(attributeType, true) != null);
+            }
+
+            return propertyKeyInfo;
+        }
+
+        public PropertyInfo GetKeyProperty()
+        {
+            var result = this.GetPropertyByAttribute(typeof(KeyAttribute));
+            return result;
+        }
+
 
         public object GetPrimaryKeyType()
         {
@@ -164,6 +202,12 @@ namespace Common.Entities
                 }
             }
             return null;
+        }
+
+        public TableConfigAttribute GetTableConfig()
+        {
+            var tableConfig = this?.GetType()?.GetCustomAttributes<TableConfigAttribute>(true)?.FirstOrDefault();
+            return tableConfig;
         }
 
         public BaseEntity()

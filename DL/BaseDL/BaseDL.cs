@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace ECommerce.DL
 {
-    public class BaseDL : IBaseDL
+    public partial class BaseDL : IBaseDL
     {
         protected IDbConnection? mySqlConnection;
 
@@ -23,16 +23,6 @@ namespace ECommerce.DL
             throw new NotImplementedException();
         }
 
-        public IEnumerable<T> GetAll<T>()
-        {
-
-            
-            string storedProcedure = String.Format(Procedure.GET_ALL, typeof(T).Name);
-            OpenDB();
-            var result = mySqlConnection.Query<T>(storedProcedure, commandType: CommandType.StoredProcedure);
-            CloseDB();
-            return result;
-        }
         #region Get
         public virtual T GetByID<T>(int ID)
         {
@@ -50,12 +40,12 @@ namespace ECommerce.DL
 
         public IEnumerable<BaseEntity> GetAllBase()
         {
-            return new List<BaseEntity>() {
-            new BaseEntity() { CreatedDate = DateTime.Now, CreatedBy = "Long" },
-            new BaseEntity() { CreatedDate = DateTime.Now, CreatedBy = "Mike" },
-            new BaseEntity() { CreatedDate = DateTime.Now, CreatedBy = "John" },
-            new BaseEntity() { CreatedDate = DateTime.Now, CreatedBy = "Tony"}
-            };
+            //string storedProcedure = String.Format(Procedure.GET_ALL, this.Curr);
+            //OpenDB();
+            //var result = mySqlConnection.Query<T>(storedProcedure, commandType: CommandType.StoredProcedure);
+            //CloseDB();
+            //return result;
+            throw new NotImplementedException();
         }
 
         public IEnumerable<T> GetByFilter<T>(string filter)
@@ -83,12 +73,6 @@ namespace ECommerce.DL
             }
         }
 
-        public async Task<int> ExecuteAsyncUsingStoredProcedure(string storedProcedure, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
-        {
-            var result = await connection.ExecuteAsync(storedProcedure, commandType: CommandType.StoredProcedure, param: parameters, transaction: transaction);
-            return result;
-        }
-
         public IDbConnection GetDbConnection(string connectionString) 
         {
             if (connectionString != null)
@@ -113,9 +97,25 @@ namespace ECommerce.DL
             throw new NotImplementedException();
         }
 
+
         public string GetInsertProcedureName(BaseEntity entity)
         {
-            throw new NotImplementedException();
+            var tableConfig = entity.GetType().GetCustomAttributes<TableConfigAttribute>(true).FirstOrDefault();
+            if (tableConfig != null)
+            {
+                if (!string.IsNullOrWhiteSpace(tableConfig.InsertStoredProcedure))
+                {
+                    return tableConfig.InsertStoredProcedure;
+                }
+                else if (!string.IsNullOrWhiteSpace(tableConfig.TableName))
+                {
+                    var tableName = tableConfig.TableName;
+                    string prefix = tableConfig.StoreProcedurePrefixName ?? string.Empty;
+                    return string.Format(Procedure.INSERT, tableName);
+
+                }
+            }
+            return null;
         }
 
         public string GetUpdateProcedureName(BaseEntity entity)
@@ -130,7 +130,7 @@ namespace ECommerce.DL
                 {
                     var tableName = tableConfig.TableName;
                     string prefix = tableConfig.StoreProcedurePrefixName ?? string.Empty ;
-                    return string.Format(Procedure.INSERT, tableName);
+                    return string.Format(Procedure.UPDATE, tableName);
 
                 }
             }
@@ -157,31 +157,15 @@ namespace ECommerce.DL
             return null;
         }
 
-        public async Task<bool> ExecuteUsingStoredProcedure(string storedProcedure, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
+
+        public T ExecuteScalarUsingCommandText<T>(string sql, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
         {
-            var result = await connection.ExecuteAsync(storedProcedure, parameters, transaction, commandType: CommandType.StoredProcedure);
-            return result > 0;
+            return ExecuteScalarAsyncUsingStoredProcedure<T>(sql, parameters, connection, transaction).Result;
         }
 
-        public async Task<T> ExecuteScalarUsingStoredProcedure<T>(string storedProcedure, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
+        public T ExecuteScalarUsingStoredProcedure<T>(string storedProcedure, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
         {
-            T result = default(T);
-            var cd = new CommandDefinition();
-
-            try
-            {
-                var con = transaction != null ? transaction.Connection : connection;
-                if (con != null)
-                {
-                    result = await con.ExecuteScalarAsync<T>(storedProcedure, parameters, transaction);
-                }
-                return result;
-            }
-            catch (Exception)
-            {
-
-                throw;
-            }
+            throw new NotImplementedException();
         }
     }
 }

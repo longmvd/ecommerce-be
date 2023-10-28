@@ -12,6 +12,9 @@ namespace ECommerce.Common.Entities
 
         public string ForeignKeyName { get; set; }
 
+        /// <summary>
+        /// Tên trường danh sách các con
+        /// </summary>
         public string PropertyNameOnMaster { get; set; }
 
         public bool OnDeleteCascade { get; set; }

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ecommerce
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    ports:
+      - '3000:80'
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0.31
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456 # Change the root password here
+      MYSQL_DATABASE: ecommerce
+    ports:
+      - "3309:3306"
+    volumes:
+      - db-data:/var/lib/mysql # Mount a volume for MySQL data storage
+
+volumes:
+  db-data:
