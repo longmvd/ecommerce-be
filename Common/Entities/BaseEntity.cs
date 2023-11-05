@@ -24,6 +24,7 @@ namespace Common.Entities
         public string? CreatedBy { get; set; }
 
         [NotMapped]
+        [JsonIgnore]
         public ModelState State { get; set; }
 
         [NotMapped]

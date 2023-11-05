@@ -448,6 +448,10 @@ namespace ECommerce.BL
             {
                 builder.Append(string.Join(" AND ", conditions));
             }
+            else
+            {
+                builder.Append("1=1");
+            }
             if (pagingRequest.Sort != null)
             {
                 var sort = JsonConvert.DeserializeObject<List<PagingSort>>(pagingRequest.Sort ?? "");
@@ -615,7 +619,8 @@ namespace ECommerce.BL
         private string BuildSelectCount(Type typeModel, string condition)
         {
             var instance = (BaseEntity)Activator.CreateInstance(typeModel);
-            return $"SELECT COUNT(1) FROM {instance.GetTableConfig().TableName ?? typeModel.Name} WHERE {condition}";
+            condition = string.IsNullOrWhiteSpace(condition) ? "1=1" : condition;
+            return $"SELECT COUNT(1) FROM {instance.GetTableConfig().TableName ?? typeModel.Name} WHERE { condition }";
         }
 
 

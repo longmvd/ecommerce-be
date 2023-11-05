@@ -1,7 +1,9 @@
 using Common.Entities;
+using Ecommerce.BL;
 using Ecommerce.DL;
 using ECommerce.BL;
 using ECommerce.Common.Entities;
+using ECommerce.Common.Extension;
 using ECommerce.DL;
 using Microsoft.AspNetCore.Builder;
 using System.Net;
@@ -11,8 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddScoped(typeof(IBaseDL), typeof(BaseDL));
 builder.Services.AddScoped(typeof(IBaseBL), typeof(BaseBL));
-//builder.Services.AddScoped<IProductDL, ProductDL>();
-//builder.Services.AddScoped<IProductBL, ProductBL>();
+builder.Services.AddScoped<ITestDL, TestDL>();
+builder.Services.AddScoped<ITestBL, TestBL>();
 //builder.Services.AddSingleton<BaseEntityQuery>();
 //builder.Services.AddSingleton<BaseEntityType>();
 //builder.Services.AddSingleton<IDocumentExecuter, DocumentExecuter>();
@@ -31,8 +33,7 @@ builder.Services.AddSwaggerGen();
 //builder.Services.AddGraphQLServer()
 //    .AddQueryType<Query>().AddType<UserType>().AddType<RoleType>();
 
-builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.PropertyNamingPolicy = null);
-builder.Services.AddControllers().ConfigureApiBehaviorOptions(options => options.SuppressModelStateInvalidFilter = true);
+builder.Services.AddControllers().AddBaseControllerConfig();
 
 //if (!builder.Environment.IsDevelopment())
 //{
