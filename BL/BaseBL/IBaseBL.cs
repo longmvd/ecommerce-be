@@ -15,7 +15,7 @@ namespace ECommerce.BL
         #region GET
         Task<IEnumerable<T>> GetAll<T>(Type type) where T : BaseEntity;
 
-        Task<T> GetByID<T>(Type type, int id) where T : BaseEntity;
+        Task<T> GetByID<T>(Type type, string id) where T : BaseEntity;
 
         Task<PagingResponse> GetPagingAsync(Type type, PagingRequest pagingRequest);
 
@@ -36,6 +36,8 @@ namespace ECommerce.BL
 
         Task<ServiceResponse> SaveChangesAsync(BaseEntity entity);
 
+        Task<ServiceResponse> SaveChangesAsync(BaseEntity entity, List<EntityFieldUpdate> fieldUpdates);
+
         Task<ServiceResponse> SaveListAsync(IEnumerable<BaseEntity> entities);
         #endregion
 
@@ -53,6 +55,9 @@ namespace ECommerce.BL
         Task<T> ExecuteUsingStoredProcedure<T>(string storedProcedureName, IDbTransaction transaction, object param);
 
         Task<T> ExecuteScalarAsyncUsingCommandText<T>(string commandText, IDbTransaction transaction, object param);
+        Task<T> ExecuteScalarAsyncUsingCommandText<T>(string commandText, object param);
+
+
 
         #region Query Async
         Task<IEnumerable<T>> QueryAsyncUsingCommandText<T>(string commandText, IDictionary<string, object>? parameters, IDbConnection connection = null, IDbTransaction transaction = null);

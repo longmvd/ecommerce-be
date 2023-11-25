@@ -45,7 +45,7 @@ namespace ECommerce.Common.DTO
         public ServiceResponse OnException(object data)
         {
             this.IsSuccess = false;
-            this.Data = data?.Get<string>("Data");
+            this.Data = data?.Get<object>("Data");
             this.SystemMessage = data?.Get<string>("ExceptionMessage");
             //todo
             return this;
@@ -54,7 +54,7 @@ namespace ECommerce.Common.DTO
         public ServiceResponse OnError(object data)
         {
             this.IsSuccess = false;
-            this.Data = data?.Get<string>("Data");
+            this.Data = data?.Get<object>("Data");
             this.SystemMessage = data?.Get<string>("ErrorMessage");
             //todo
             return this;

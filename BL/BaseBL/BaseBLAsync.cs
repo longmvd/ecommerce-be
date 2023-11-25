@@ -11,6 +11,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Resources;
 using System.Text;
@@ -23,13 +24,13 @@ namespace ECommerce.BL
     public partial class BaseBL : IBaseBL
     {
 
-        public async Task<T> GetByID<T>(Type type, int id) where T : BaseEntity
+        public virtual async Task<T> GetByID<T>(Type type, string id) where T : BaseEntity
         {
             var instance = (BaseEntity)Activator.CreateInstance(type);
             var keyName = instance.GetKeyProperty()?.Name;
             if (keyName != null)
             {
-                var pagingRequset = new PagingRequest() { CustomFilter = $"[\"{keyName}\", \"=\", {id}]" };
+                var pagingRequset = new PagingRequest() { CustomFilter = $"[\"{keyName}\", \"=\", \"{id}\"]" };
                 var result = (await GetPagingAsync(type, pagingRequset)).PageData as IEnumerable<T>;
                 return (T)result.FirstOrDefault();
             }
@@ -111,6 +112,76 @@ namespace ECommerce.BL
         public virtual async Task<ServiceResponse> SaveChangesAsync(BaseEntity entity)
         {
             throw new NotImplementedException();
+        }
+
+        public virtual async Task<ServiceResponse> SaveChangesAsync(BaseEntity entity, List<EntityFieldUpdate> fieldUpdates)
+        {
+            var response = new ServiceResponse();
+            IDbConnection connection = null;
+            IDbTransaction transaction = null;
+            try
+            {
+
+                //validate
+
+
+                //before save
+
+
+
+                connection = _baseDL.GetDbConnection(null);
+                connection.Open();
+                transaction = connection.BeginTransaction();
+
+                //save
+
+
+                var result = await DoSaveChangesAsync(entity, fieldUpdates, transaction);
+
+                if (result)
+                {
+                    this.AfterSaveChanges(entity, fieldUpdates, transaction);
+                    transaction.Commit();
+
+                    //log
+                }
+                else
+                {
+                    transaction.Rollback();
+                    response.IsSuccess = false;
+                }
+            }
+            catch (Exception)
+            {
+                if (transaction != null)
+                {
+                    transaction.Rollback();
+                    response.IsSuccess = false;
+
+                }
+                throw;
+
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    transaction.Dispose();
+                }
+                if (connection != null && connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                    connection.Dispose();
+                }
+            }
+            if (response.IsSuccess)
+            {
+                this.AfterCommitSaveChanges(entity, fieldUpdates, response);
+            }
+
+            return response;
+
+
         }
 
         public virtual async Task<ServiceResponse> SaveListAsync(IEnumerable<BaseEntity> entities)
@@ -246,6 +317,13 @@ namespace ECommerce.BL
             return true;
         }
 
+        public virtual async Task<bool> DoSaveChangesAsync(BaseEntity entity, List<EntityFieldUpdate> fieldUpdates, IDbTransaction transaction)
+        {
+            var param = new Dictionary<string, object>();
+            var sql = BuildUpdateFieldsCommandText(entity, fieldUpdates, ref param, true);
+            return await this.ExecuteScalarAsyncUsingCommandText<bool>(sql, transaction, param);
+        }
+
         public async virtual Task<bool> DoDeleteAsync(BaseEntity entity, IDbTransaction transaction)
         {
             var param = new Dictionary<string, object>();
@@ -293,7 +371,52 @@ namespace ECommerce.BL
 
         public virtual async Task<T> ExecuteScalarAsyncUsingCommandText<T>(string commandText, IDbTransaction transaction, object param)
         {
-            return await this.ExecuteScalarAsyncUsingStoredProcedure<T>(commandText, transaction, param);
+            return await this.ExecuteScalarAsyncUsingCommandText<T>(commandText, (IDictionary<string, object>)param, null, transaction);
+        }
+
+        public virtual async Task<T> ExecuteScalarAsyncUsingCommandText<T>(string commandText, object param)
+        {
+            IDbConnection connection = null;
+            IDbTransaction transaction = null;
+            var result = default(T);
+            try
+            {
+                connection = _baseDL.GetDbConnection(null);
+                connection.Open();
+                transaction = connection.BeginTransaction();
+                result = await this.ExecuteScalarAsyncUsingCommandText<T>(commandText, (IDictionary<string, object>)param, connection, transaction);
+                transaction.Commit();
+            }
+            catch (Exception)
+            {
+                if (transaction != null)
+                {
+                    transaction.Rollback();
+
+                }
+                throw;
+
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    transaction.Dispose();
+                }
+                if (connection != null && connection.State == ConnectionState.Open)
+                {
+                    connection.Close();
+                    connection.Dispose();
+                }
+            }
+            return result;
+
+        }
+
+
+        public virtual async Task<T> ExecuteScalarAsyncUsingCommandText<T>(string commandText, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
+        {
+            return await _baseDL.ExecuteScalarAsyncUsingCommandText<T>(commandText, parameters, connection, transaction);
         }
 
         private string GetCommandTextByModelState(BaseEntity entity, ref Dictionary<string, object> param)
@@ -400,7 +523,7 @@ namespace ECommerce.BL
         }
 
         #region Get
-        public async Task<IEnumerable<T>> GetAll<T>(Type type) where T : BaseEntity
+        public virtual async Task<IEnumerable<T>> GetAll<T>(Type type) where T : BaseEntity
         {
             var res = default(IEnumerable<T>);
             var entity = (T)Activator.CreateInstance(type);
@@ -419,10 +542,11 @@ namespace ECommerce.BL
             return res;
         }
 
-        public async Task<PagingResponse> GetPagingAsync(Type type, PagingRequest pagingRequest)
+        public virtual async Task<PagingResponse> GetPagingAsync(Type type, PagingRequest pagingRequest)
         {
             var response = new PagingResponse();
             var commandText = BaseEntityQuery.BaseBL_GetPaging;
+            GetPagingCommandText(ref commandText);
             var instance = (BaseEntity)Activator.CreateInstance(type);
             var columns = "*";
             if (pagingRequest.Columns != null)
@@ -513,6 +637,11 @@ namespace ECommerce.BL
                 entity.State = ModelState.Update;
             }
             return await this.SaveAsync(entity);
+        }
+
+        public virtual void GetPagingCommandText(ref string commandText)
+        {
+            // to do assign command text
         }
 
     }

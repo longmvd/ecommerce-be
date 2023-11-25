@@ -1,7 +1,9 @@
 ﻿using Common.Entities;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -37,7 +39,13 @@ namespace ECommerce.Common
         public static bool IsValidColumn(Type type, string column)
         {
             var result =  type.GetProperty(column);
-            return result != null;
+            return result != null && !IsNotMappedColumn(type, column);
+        }
+
+        public static bool IsNotMappedColumn(Type type, string column)
+        {
+            var propertyInfo = type.GetProperty(column);
+            return propertyInfo != null && propertyInfo.GetCustomAttributes<NotMappedAttribute>().Any();
         }
     }
 }

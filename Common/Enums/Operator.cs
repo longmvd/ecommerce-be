@@ -22,6 +22,8 @@ namespace ECommerce.Common.Enums
         public const string Is = "IS";
         public const string NotNull = "NOT NULL";
         public const string IsNotNull = "IS NOT NULL";
+        public const string In = "IN";
+        public const string NotIn = "NOT IN";
 
 
 

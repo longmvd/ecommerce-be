@@ -18,6 +18,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using static Dapper.SqlMapper;
 
 namespace ECommerce.BL
 {
@@ -123,7 +124,26 @@ namespace ECommerce.BL
             response.ServerTime = DateTime.Now;
         }
 
+        public virtual void AfterCommitSaveChanges(BaseEntity entity, List<EntityFieldUpdate> fieldUpdates, ServiceResponse response)
+        {
+            //todo
+            foreach(var fieldUpdate in fieldUpdates)
+            {
+
+                entity.SetProperty(fieldUpdate.FieldName, fieldUpdate.FieldValue);
+
+            }
+            response.Data = entity;
+            response.ServerTime = DateTime.Now;
+        }
+
+
         public virtual void AfterSave(BaseEntity entity, IDbTransaction transaction)
+        {
+            //todo anything after save successfully if needed
+        }
+
+        public virtual void AfterSaveChanges(BaseEntity entity, List<EntityFieldUpdate> fieldUpdates, IDbTransaction transaction)
         {
             //todo anything after save successfully if needed
         }
@@ -137,7 +157,7 @@ namespace ECommerce.BL
 
             if (entity.GetPrimaryKeyType() == typeof(int))
             {
-                var primaryKey = ExecuteScalarAsyncUsingStoredProcedure<int>(storedProcedure, transaction, dic).Result;
+                var primaryKey = ExecuteScalarAsyncUsingCommandText<int>(storedProcedure, transaction, dic).Result;
                 if (entity.State == ModelState.Insert || entity.State == ModelState.Dupplicate)
                 {
                     entity.SetValueByAttribute(typeof(KeyAttribute), primaryKey);
@@ -145,7 +165,7 @@ namespace ECommerce.BL
             }
             else
             {
-                this.ExecuteScalarUsingStoredProcedure<object>(storedProcedure, transaction, dic);
+                this.ExecuteScalarAsyncUsingCommandText<object>(storedProcedure, transaction, dic);
             }
 
             if (entity.EntityDetailConfigs?.Count > 0)
@@ -210,6 +230,23 @@ namespace ECommerce.BL
 
 
         public virtual void BeforeSave(BaseEntity entity)
+        {
+            if (entity.State == ModelState.Insert || entity.State == ModelState.Dupplicate)
+            {
+                entity.CreatedBy = _userName;
+                entity.CreatedDate = DateTime.Now;
+                if (entity.GetValueOfPrimaryKey() == null)
+                {
+                    entity.SetAutoPrimaryKey();
+                }
+
+            }
+
+            entity.ModifiedBy = _userName;
+            entity.ModifiedDate = DateTime.Now;
+        }
+
+        public virtual void BeforeSaveChanges(BaseEntity entity)
         {
             if (entity.State == ModelState.Insert || entity.State == ModelState.Dupplicate)
             {
@@ -377,6 +414,54 @@ namespace ECommerce.BL
             return builder.ToString();
         }
 
+        public string BuildUpdateFieldsCommandText(BaseEntity entity, List<EntityFieldUpdate> fields, ref Dictionary<string, object> dic, bool useRowCount = false)
+        {
+            StringBuilder builder = new();
+            if (entity != null)
+            {
+                var tableConfig = entity.GetType().GetCustomAttributes<TableConfigAttribute>(true).FirstOrDefault();
+                var propertiesInfo = entity.GetType().GetProperties();
+                var commandParams = new HashSet<string>();
+                if (tableConfig != null && propertiesInfo != null && fields?.Count > 0)
+                {
+                    builder.Append($"Update {tableConfig.TableName} SET ");
+                    var keyAttr = propertiesInfo.SingleOrDefault(p => p.GetCustomAttribute<KeyAttribute>(true) != null);
+                    var keyAttrName = keyAttr?.Name ?? string.Empty;
+                    bool inValidColumns = true;
+                    foreach (var field in fields)
+                    {
+
+                        var tableColumn = field.FieldName;
+                        if (!string.IsNullOrWhiteSpace(tableColumn) 
+                            && SecurityUtils.IsValidColumn(entity.GetType(), tableColumn)
+                            && !keyAttr.Name.Equals(tableColumn, StringComparison.OrdinalIgnoreCase))
+                        {
+                            inValidColumns = false;
+                            var paramString = Utils.GenerateSearchParam();
+                            builder.Append($"{tableColumn} = {paramString},");
+                            dic.Add($"{paramString}", field.FieldValue);
+                        }
+
+                    }
+                    if (inValidColumns)
+                    {
+                        builder.Clear();
+                    }
+                    else
+                    {
+                        builder.Remove(builder.Length - 1, 1);
+                        builder.Append($" WHERE {keyAttrName} = @ID");
+                        dic.Add($"@ID", entity.GetValueOfPrimaryKey());
+                        builder.Append(";");
+                        _ = useRowCount ? builder.Append("SELECT ROW_COUNT();") : builder.Append("");
+
+                    }
+                }
+
+            }
+            return builder.ToString();
+        }
+
         public string BuildDeleteCommandText<T>(List<T> entities, ref Dictionary<string, object> dic, bool useRowCount = false)
         {
             var builder = new StringBuilder();
@@ -484,11 +569,18 @@ namespace ECommerce.BL
                     }
                     if (element.GetType() == typeof(JValue))
                     {
-                        if (index == 0 && !SecurityUtils.IsValidColumn(type, element.ToString()))
+                        if (index == 0)
                         {
-                            throw new Exception($"Column {element.ToString()} is not exist.");
+                            if(!SecurityUtils.IsValidColumn(type, element.ToString()))
+                            {
+                                throw new Exception($"Column {element.ToString()} is not exist.");
+                            }
+                            else
+                            {
+                                whereCondition += " " + element.ToString() + " ";
+                            }
                         }
-
+                        else
                         if (index == 2)
                         {
                             var stringParam = Utils.GenerateSearchParam();
@@ -519,9 +611,10 @@ namespace ECommerce.BL
             {
                 case Operator.Equal:
                     return "= {0}";
+                case Operator.StartWith:
+                case Operator.EndWith:
                 case Operator.Contains:
                     return "LIKE {0}";
-                //return "LIKE";
                 case Operator.NotEqual:
                     return "<> {0}";
                 case Operator.LessOrEqual:
@@ -532,12 +625,6 @@ namespace ECommerce.BL
                     return "< {0}";
                 case Operator.GreaterThan:
                     return "> {0}";
-                case Operator.StartWith:
-                    //return "LIKE";
-                    return "LIKE {0}";
-                case Operator.EndWith:
-                    //return "LIKE";
-                    return "LIKE {0}";
                 case Operator.And:
                     return "AND";
                 case Operator.Or:
@@ -546,26 +633,49 @@ namespace ECommerce.BL
                     return "IS NOT NULL";
                 case Operator.NotNull:
                     return "NOT NULL";
-
-
+                case Operator.In:
+                    return "IN {0}";
+                case Operator.NotIn:
+                    return "NOT IN {0}";
             }
-            return value;
+            return "LIKE {0}";
         }
 
-        private string GetConditionValue(string op, string value)
+        private object GetConditionValue(string op, string value)
         {
             switch (op.ToUpper())
             {
                 case Operator.Contains:
-                    return $"'%{SecurityUtils.SafetyCharsForLIKEOperator(value)}%'";
+                    return $"%{SecurityUtils.SafetyCharsForLIKEOperator(value)}%";
                 case Operator.StartWith:
                     //return "LIKE";
-                    return $"'%{SecurityUtils.SafetyCharsForLIKEOperator(value)}'";
+                    return $"{SecurityUtils.SafetyCharsForLIKEOperator(value)}%";
                 case Operator.EndWith:
                     //return "LIKE";
-                    return $"'{SecurityUtils.SafetyCharsForLIKEOperator(value)}%'";
+                    return $"%{SecurityUtils.SafetyCharsForLIKEOperator(value)}";
+                case Operator.In:
+                case Operator.NotIn:
+                    return GetMultipleValue(SecurityUtils.SafetyCharsForLIKEOperator(value));
+
             }
             return $"{SecurityUtils.SafetyCharsForLIKEOperator(value)}";
+        }
+
+        private string[] GetMultipleValue(string rawValue)
+        {
+            try
+            {
+                if(rawValue != null)
+                {
+                    return rawValue.Split(",");
+                }
+
+            }catch (Exception)
+            {
+                return new string[] {};
+            }
+            return new string[] { };
+
         }
 
         private string BuildSortOrder(IEnumerable<PagingSort> sorts)

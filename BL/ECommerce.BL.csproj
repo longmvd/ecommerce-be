@@ -14,4 +14,10 @@
     <ProjectReference Include="..\DL\ECommerce.DL.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Queries\Queries.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -46,7 +46,7 @@ namespace ECommerce.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetByID([FromRoute] int id)
+        public async Task<IActionResult> GetByID([FromRoute] string id)
         {
             var response = new ServiceResponse();
             var res = await _baseBL.GetByID<BaseEntity>(this.CurrentType, id);
@@ -105,6 +105,32 @@ namespace ECommerce.Controllers
 
                 entity.SetPrimaryKey(id);
                 return Ok(await _baseBL.UpdateOneAsync(entity));
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500,
+                    new ServiceResponse().OnException(new { ExceptionMessage = ex.Message })
+
+                );
+            }
+        }
+
+        [HttpPatch("{id}")]
+        public virtual async Task<IActionResult> UpdateFields([FromBody] object stringEntity, [FromRoute] string id)
+        {
+            try
+            {
+                var response = new ServiceResponse();
+                if (stringEntity == null)
+                {
+                    return BadRequest(response.OnError(new { ErrorMessage = Resource.DEV_NullRequestObject }));
+                }
+                var entity = (BaseEntity)Activator.CreateInstance(CurrentType);
+                var fieldUpdates = JsonConvert.DeserializeObject<List<EntityFieldUpdate>>(stringEntity.ToString());
+
+                entity.SetPrimaryKey(id);
+                return Ok(await _baseBL.SaveChangesAsync(entity, fieldUpdates));
 
             }
             catch (Exception ex)

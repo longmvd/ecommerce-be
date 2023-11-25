@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -106,6 +107,31 @@ namespace ECommerce.Common.Extension
                 return property.PropertyType;
             }
             return typeof(object);
+        }
+
+        /// <summary>
+        /// Set value for prop by type
+        /// </summary>
+        /// <author>MDLong</author>
+        /// <param name="obj"></param>
+        /// <param name="propertyName"></param>
+        /// <param name="value"></param>
+        public static void SetProperty(this object obj, string propertyName, string value)
+        {
+            // Get the type of the object
+            Type type = obj.GetType();
+
+            // Get the property by name
+            var property = type.GetProperty(propertyName);
+            if (property != null) 
+            { 
+                TypeConverter typeConverter = TypeDescriptor.GetConverter(property.PropertyType);
+                object convertedValue = typeConverter.ConvertFromString(value);
+
+                // Set the value of the property
+                property.SetValue(obj, convertedValue);
+            }
+
         }
     }
 }

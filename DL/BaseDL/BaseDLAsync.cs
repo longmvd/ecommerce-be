@@ -37,7 +37,7 @@ namespace ECommerce.DL
                 var con = transaction != null ? transaction.Connection : connection;
                 if (con != null)
                 {
-                    result = await con.ExecuteScalarAsync<T>(storedProcedure, parameters, transaction);
+                    result = await con.ExecuteScalarAsync<T>(storedProcedure, parameters, transaction, commandType: CommandType.StoredProcedure);
                 }
                 return result;
             }
@@ -51,7 +51,23 @@ namespace ECommerce.DL
 
         public async Task<T> ExecuteScalarAsyncUsingCommandText<T>(string commandText, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
         {
-            return await ExecuteScalarAsyncUsingStoredProcedure<T>(commandText, parameters, connection, transaction);
+            T result = default(T);
+            var cd = new CommandDefinition();
+
+            try
+            {
+                var con = transaction != null ? transaction.Connection : connection;
+                if (con != null)
+                {
+                    result = await con.ExecuteScalarAsync<T>(commandText, parameters, transaction, commandType: CommandType.Text);
+                }
+                return result;
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
         }
 
         public Task<bool> ExecuteAsyncUsingCommandText(string commandText, IDictionary<string, object> parameters, IDbConnection connection, IDbTransaction transaction)
@@ -120,7 +136,7 @@ namespace ECommerce.DL
                     int index = 0;
                     do
                     {
-                        if (types != null || types.Count > index)
+                        if (types != null && types.Count > index)
                         {
                             var ans = await reader.ReadAsync(types[index]);
                             result.Add(ans.ToList());
