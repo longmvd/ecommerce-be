@@ -1,4 +1,5 @@
 ﻿using Common.Entities;
+using ECommerce.Common.Attributes;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -42,10 +43,22 @@ namespace ECommerce.Common
             return result != null && !IsNotMappedColumn(type, column);
         }
 
+        public static bool IsValidFilterColumn(Type type, string column)
+        {
+            
+            return IsValidColumn(type, column) || IsFilterColumn(type, column);
+        }
+
         public static bool IsNotMappedColumn(Type type, string column)
         {
             var propertyInfo = type.GetProperty(column);
             return propertyInfo != null && propertyInfo.GetCustomAttributes<NotMappedAttribute>().Any();
+        }
+
+        public static bool IsFilterColumn(Type type, string column)
+        {
+            var propertyInfo = type.GetProperty(column);
+            return propertyInfo != null && propertyInfo.GetCustomAttributes<FilterColumnAttribute>().Any();
         }
     }
 }

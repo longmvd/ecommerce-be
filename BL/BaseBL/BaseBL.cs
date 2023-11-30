@@ -318,7 +318,7 @@ namespace ECommerce.BL
                             foreach (var property in properties)
                             {
 
-                                if (property.GetCustomAttributes<NotMappedAttribute>(true).FirstOrDefault() != null)
+                                if (property.GetCustomAttributes<NotMappedAttribute>(true).FirstOrDefault() != null || (property.GetCustomAttributes<KeyAttribute>(true).FirstOrDefault() != null && (property.PropertyType == typeof(Int32) || property == typeof(long))))
                                 {
                                     continue;
                                 }
@@ -571,13 +571,15 @@ namespace ECommerce.BL
                     {
                         if (index == 0)
                         {
-                            if(!SecurityUtils.IsValidColumn(type, element.ToString()))
+                            if(!SecurityUtils.IsValidFilterColumn(type, element.ToString()))
                             {
                                 throw new Exception($"Column {element.ToString()} is not exist.");
                             }
                             else
                             {
-                                whereCondition += " " + element.ToString() + " ";
+                                var column = element.ToString();
+                                OnBuildColumnFilter(ref column);
+                                whereCondition += " " + column + " ";
                             }
                         }
                         else
@@ -605,6 +607,10 @@ namespace ECommerce.BL
             return "";
         }
 
+        public virtual void OnBuildColumnFilter(ref string column)
+        {
+            //to do
+        }
         private string GetCondition(string value)
         {
             switch (value.ToUpper())
@@ -730,8 +736,23 @@ namespace ECommerce.BL
         {
             var instance = (BaseEntity)Activator.CreateInstance(typeModel);
             condition = string.IsNullOrWhiteSpace(condition) ? "1=1" : condition;
-            return $"SELECT COUNT(1) FROM {instance.GetTableConfig().TableName ?? typeModel.Name} WHERE { condition }";
+            var tableName = instance.GetTableConfig().TableName ?? typeModel.Name;
+            GetTableNamePagingCommandText(ref tableName);
+            var commandText = $"SELECT COUNT(1) FROM {tableName} WHERE {condition}";
+            GetTotalCountPagingCommandText(ref commandText);
+            return commandText;
         }
+
+        public virtual void GetTotalCountPagingCommandText(ref string commandText)
+        {
+
+        }
+
+        public virtual void GetTableNamePagingCommandText(ref string tableName)
+        {
+
+        }
+
 
 
 

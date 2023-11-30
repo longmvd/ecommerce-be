@@ -558,6 +558,7 @@ namespace ECommerce.BL
             var condition = BuildPagingCommandText(type, pagingRequest, ref param);
             var tableName = instance.GetTableConfig()?.TableName ?? instance.GetType().Name;
             commandText = string.Format(commandText, new object[] { columns, tableName, condition });
+            OnBeforeExecutePagingQuery(ref commandText);
             var result = await QueryMultipleAsyncUsingCommandText(new List<Type>() { type, typeof(int) }, commandText, param);
             response.PageData = JsonConvert.DeserializeObject(JsonConvert.SerializeObject(result?.ElementAt(0)), typeof(List<>).MakeGenericType(type));
             response.Total = JsonConvert.DeserializeObject<int>(JsonConvert.SerializeObject(result?.ElementAt(1).FirstOrDefault()));
@@ -642,6 +643,12 @@ namespace ECommerce.BL
         public virtual void GetPagingCommandText(ref string commandText)
         {
             // to do assign command text
+        }
+
+        public virtual void OnBeforeExecutePagingQuery(ref string commandText)
+        {
+            // to do assign command text
+
         }
 
     }
