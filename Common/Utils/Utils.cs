@@ -11,9 +11,11 @@ namespace ECommerce.Common
 {
     public class Utils
     {
-        public static string GetStringQuery(string queryName, string filename = "../BL/Queries/Queries.json")
+        public static string GetStringQuery(string queryName, string filename = "Queries/Queries.json")
         {
-            var text = File.ReadAllText(filename);
+            var fullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, filename);
+
+            var text = File.ReadAllText(fullPath);
 
             var queries = JObject.Parse(text);
             var stringQuery = (string)queries?[queryName];

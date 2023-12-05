@@ -6,6 +6,7 @@ using ECommerce.Common.Entities;
 using ECommerce.Common.Enums;
 using ECommerce.Common.Extension;
 using ECommerce.DL;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -27,9 +28,11 @@ namespace ECommerce.BL
     {
         //protected IAuthService _authService;
         protected IBaseDL _baseDL;
-        public BaseBL(IBaseDL baseDL)
+        protected IConfiguration _configuration;
+        public BaseBL(IBaseDL baseDL, IConfiguration configuration)
         {
             _baseDL = baseDL;
+            _configuration = configuration;
         }
 
         protected string _userName = "";
