@@ -46,11 +46,14 @@ namespace ECommerce.BL
             {
 
                 //validate
-                var validateResult = new List<ValidateResult>();
+                var validateResults = new List<ValidateResult>();
 
-                if (validateResult.Count > 0)
+                await ValidateBeforeSaveAsync(entity, validateResults);
+
+
+                if (validateResults.Count > 0)
                 {
-                    response.IsSuccess = false;
+                    response.OnError(new ErrorResponse() { Data = validateResults });
                     return response;
 
                 }
@@ -113,6 +116,12 @@ namespace ECommerce.BL
         {
             throw new NotImplementedException();
         }
+
+        public virtual Task ValidateBeforeSaveAsync(BaseEntity baseModel, List<ValidateResult> validateResults)
+        {
+            return Task.CompletedTask;
+        }
+
 
         public virtual async Task<ServiceResponse> SaveChangesAsync(BaseEntity entity, List<EntityFieldUpdate> fieldUpdates)
         {
@@ -264,7 +273,7 @@ namespace ECommerce.BL
             string storedProcedure = GetCommandTextByModelState(entity, ref dic);
             //var dic = Converter.ConvertDatabaseParam(entity);
 
-            if (entity.GetPrimaryKeyType() == typeof(int))
+            if (entity.GetPrimaryKeyType() == typeof(int) || entity.GetPrimaryKeyType() == typeof(long))
             {
                 var primaryKey = await ExecuteScalarAsyncUsingCommandText<int>(storedProcedure, transaction, dic);
                 if (entity.State == ModelState.Insert || entity.State == ModelState.Dupplicate)
@@ -274,7 +283,11 @@ namespace ECommerce.BL
             }
             else
             {
-                await this.ExecuteScalarAsyncUsingStoredProcedure<object>(storedProcedure, transaction, dic);
+                if (entity.State == ModelState.Insert || entity.State == ModelState.Dupplicate)
+                {
+                    entity.SetAutoPrimaryKey();
+                }
+                await this.ExecuteScalarAsyncUsingCommandText<object>(storedProcedure, transaction, dic);
             }
 
             if (entity.EntityDetailConfigs?.Count > 0)
@@ -560,8 +573,9 @@ namespace ECommerce.BL
             commandText = string.Format(commandText, new object[] { columns, tableName, condition });
             OnBeforeExecutePagingQuery(ref commandText);
             var result = await QueryMultipleAsyncUsingCommandText(new List<Type>() { type, typeof(int) }, commandText, param);
-            response.PageData = JsonConvert.DeserializeObject(JsonConvert.SerializeObject(result?.ElementAt(0)), typeof(List<>).MakeGenericType(type));
-            response.Total = JsonConvert.DeserializeObject<int>(JsonConvert.SerializeObject(result?.ElementAt(1).FirstOrDefault()));
+            result = await OnAfterExecutePagingQueryAsync(result);
+            response.PageData = JsonConvert.DeserializeObject(JsonConvert.SerializeObject(result?.ElementAt(0)), typeof(List<>).MakeGenericType(result?.ElementAtOrDefault(0)?.FirstOrDefault()?.GetType() ?? type));
+            response.Total = JsonConvert.DeserializeObject<int>(JsonConvert.SerializeObject(result?.ElementAt(1).FirstOrDefault()));  
             return response;
         }
 
@@ -631,7 +645,7 @@ namespace ECommerce.BL
             var response = new ServiceResponse();
             if (entity == null)
             {
-                return response.OnError(Resource.DEV_NullRequestObject);
+                return response.OnError(new ErrorResponse() { ErrorMessage = Resource.DEV_NullRequestObject });
             }
             else
             {
@@ -649,6 +663,12 @@ namespace ECommerce.BL
         {
             // to do assign command text
 
+        }
+
+        public virtual async Task<IEnumerable<IEnumerable<object>>> OnAfterExecutePagingQueryAsync(IEnumerable<IEnumerable<object>> result)
+        {
+            // to do handle result
+            return await Task.FromResult(result);
         }
 
     }

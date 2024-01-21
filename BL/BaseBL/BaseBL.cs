@@ -59,6 +59,8 @@ namespace ECommerce.BL
                 //validate
                 var validateResult = new List<ValidateResult>();
 
+                ValidateBeforeSave(entity, validateResult);
+
                 if (validateResult.Count > 0)
                 {
                     response.IsSuccess = false;
@@ -118,6 +120,11 @@ namespace ECommerce.BL
             }
 
             return response;
+        }
+
+        public virtual void ValidateBeforeSave(BaseEntity entity, List<ValidateResult> validateResult)
+        {
+            
         }
 
         public virtual void AfterCommit(BaseEntity entity, ServiceResponse response)

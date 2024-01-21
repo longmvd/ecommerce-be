@@ -85,7 +85,7 @@ namespace ECommerce.Controllers
             }catch (Exception ex)
             {
                 return BadRequest(
-                    new ServiceResponse().OnException(new { ExceptionMessage = ex.Message })
+                    new ServiceResponse().OnException(new ExceptionResponse(){ ExceptionMessage = ex.Message })
 
                 ) ;
             }
@@ -99,7 +99,7 @@ namespace ECommerce.Controllers
                 var response = new ServiceResponse();
                 if(stringEntity == null)
                 {
-                    return BadRequest(response.OnError(new { ErrorMessage = Resource.DEV_NullRequestObject }));
+                    return BadRequest(response.OnError(new ErrorResponse(){ ErrorMessage = Resource.DEV_NullRequestObject }));
                 }
                 var entity = (BaseEntity)JsonConvert.DeserializeObject(stringEntity.ToString(), this.CurrentType);
 
@@ -110,7 +110,7 @@ namespace ECommerce.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500,
-                    new ServiceResponse().OnException(new { ExceptionMessage = ex.Message })
+                    new ServiceResponse().OnException(new ExceptionResponse() { ExceptionMessage = ex.Message })
 
                 );
             }
@@ -124,7 +124,7 @@ namespace ECommerce.Controllers
                 var response = new ServiceResponse();
                 if (stringEntity == null)
                 {
-                    return BadRequest(response.OnError(new { ErrorMessage = Resource.DEV_NullRequestObject }));
+                    return BadRequest(response.OnError(new ErrorResponse() { ErrorMessage = Resource.DEV_NullRequestObject }));
                 }
                 var entity = (BaseEntity)Activator.CreateInstance(CurrentType);
                 var fieldUpdates = JsonConvert.DeserializeObject<List<EntityFieldUpdate>>(stringEntity.ToString());
@@ -136,7 +136,7 @@ namespace ECommerce.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500,
-                    new ServiceResponse().OnException(new { ExceptionMessage = ex.Message })
+                    new ServiceResponse().OnException(new ExceptionResponse() { ExceptionMessage = ex.Message })
 
                 );
             }

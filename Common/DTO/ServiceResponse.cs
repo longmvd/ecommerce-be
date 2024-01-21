@@ -9,30 +9,30 @@ namespace ECommerce.Common.DTO
 {
     public class ServiceResponse
     {
-        public List<ValidateResult> validateResults { get; set; }
+        public List<ValidateResult>? ValidateResults { get; set; }
 
         public bool IsSuccess { get; set; } = true;
 
-        public int ErrorCode { get; set; }
+        public int? ErrorCode { get; set; }
 
         /// <summary>
         /// Displayed message for user
         /// </summary>
-        public string UserMessage { get; set; }
+        public string? UserMessage { get; set; }
 
         /// <summary>
         /// Message from system
         /// </summary>
-        public string SystemMessage { get; set; }
+        public string? SystemMessage { get; set; }
         
         /// <summary>
         /// Response data
         /// </summary>
-        public object Data { get; set; }
+        public object? Data { get; set; }
 
-        public bool GetLastData { get; set; }
+        public bool? GetLastData { get; set; }
 
-        public DateTime ServerTime { get; set; }
+        public DateTime? ServerTime { get; set; }
 
 
 
@@ -42,22 +42,37 @@ namespace ECommerce.Common.DTO
             return this;
         }
 
-        public ServiceResponse OnException(object data)
+        public ServiceResponse OnException(ExceptionResponse data)
         {
             this.IsSuccess = false;
-            this.Data = data?.Get<object>("Data");
-            this.SystemMessage = data?.Get<string>("ExceptionMessage");
+            this.Data = data.Data;
+            this.SystemMessage = data.ExceptionMessage;
             //todo
             return this;
         }
 
-        public ServiceResponse OnError(object data)
+        public ServiceResponse OnError(ErrorResponse data)
         {
             this.IsSuccess = false;
-            this.Data = data?.Get<object>("Data");
-            this.SystemMessage = data?.Get<string>("ErrorMessage");
+            this.Data = data.Data;
+            this.SystemMessage = data.ErrorMessage;
             //todo
             return this;
         }
+    }
+
+    public class DataResponse
+    {
+        public object? Data { get; set; }
+    }
+
+    public class ErrorResponse: DataResponse 
+    {
+        public string? ErrorMessage { get; set; }
+    }
+
+    public class ExceptionResponse : DataResponse
+    {
+        public string? ExceptionMessage { get; set; }
     }
 }

@@ -12,6 +12,9 @@ namespace ECommerce.BL
 {
     public interface IBaseBL
     {
+        Task ValidateBeforeSaveAsync(BaseEntity baseModel, List<ValidateResult> validateResults);
+        void ValidateBeforeSave(BaseEntity baseModel, List<ValidateResult> validateResults);
+
         #region GET
         Task<IEnumerable<T>> GetAll<T>(Type type) where T : BaseEntity;
 
